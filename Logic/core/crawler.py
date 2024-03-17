@@ -96,22 +96,19 @@ class IMDbCrawler:
             The response of the get request
         """
         # Make a GET request to the URL
-        headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-       }
-        response = requests.get(URL,headers)
+        response = requests.get(URL,headers=self.headers)
 
         # Return the response
         return response
 
-    def extract_top_250(self,reponse):
+    def extract_top_250(self):
         """
         Extract the top 250 movies from the top 250 page and use them as seed for the crawler to start crawling.
         """
         # TODO update self.not_crawled and self.added_ids
         # response = self.crawl(self.top_250_URL)
-
-        print(response,"1")
+        response=self.crawl(self.top_250_URL)
+        # print(response,"1")
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
             movie_links = soup.find_all('a',{'class','ipc-title-link-wrapper'})
@@ -145,7 +142,7 @@ class IMDbCrawler:
             'reviews': None,  # List[List[str]]
         }
 
-    def start_crawling(self,response):
+    def start_crawling(self):
         """
         Start crawling the movies until the crawling threshold is reached.
         TODO:
@@ -157,14 +154,16 @@ class IMDbCrawler:
         ThreadPoolExecutor is used to make the crawler faster by using multiple threads to crawl the pages.
         You are free to use it or not. If used, not to forget safe access to the shared resources.
         """
-        self.extract_top_250(response)
-        
+        self.extract_top_250()
+
         futures = []
         crawled_counter = 0
 
         with ThreadPoolExecutor(max_workers=20) as executor:
             while self.not_crawled and crawled_counter < self.crawling_threshold:
                 URL = self.not_crawled.popleft()
+                crawled_counter+=1
+                # print(URL,"  ",crawled_counter)
                 futures.append(executor.submit(self.crawl_page_info, URL))
                 if not self.not_crawled:
                     wait(futures)
@@ -182,17 +181,17 @@ class IMDbCrawler:
         """
         # print("new iteration")
         response=self.crawl(URL)
-        if response:
+        # print(response,2)
+        if response.status_code == 200:
           movie=self.get_imdb_instance()
-          self.extract_movie_info(response,movie,URL)
-          with self.add_queue_lock:
-            self.crwled.append(movie)
-        for link in movie['related_links']:
-          if link not in self.added_ids:
-            with self.add_queue_lock:
-              self.not_crwled.append(link)
-            with self.add_list_lock:
-              self.added_ids.add(self.get_id_from_URL(link))
+          movie=self.extract_movie_info(response,movie,URL)
+          # print(movie)
+          self.crawled.append(movie)
+          # print(self.crawled)
+          for link in movie['related_links']:
+            if link not in self.added_ids:
+                self.not_crawled.append(link)
+                self.added_ids.add(self.get_id_from_URL(link))
 
     def extract_movie_info(self, res, movie, URL):
         """
@@ -223,14 +222,14 @@ class IMDbCrawler:
         movie['languages'] = self.get_languages(soup)
         movie['countries_of_origin'] = self.get_countries_of_origin(soup)
         movie['rating'] = self.get_rating(soup)
-        response=requests.get(self.get_summary_link(URL),self.headers)
+        response=requests.get(self.get_summary_link(URL),headers=self.headers)
         soup1= BeautifulSoup(response.content, 'html.parser')
         movie['summaries'] = self.get_summary(soup1)
         movie['synopsis'] = self.get_synopsis(soup1)
-        response1=requests.get(self.get_review_link(URL),self.headers)
+        response1=requests.get(self.get_review_link(URL),headers=self.headers)
         soup2= BeautifulSoup(response1.content, 'html.parser')
         movie['reviews'] = self.get_reviews_with_scores(soup2)
-
+        return movie
     def get_summary_link(url):
         """
         Get the link to the summary page of the movie
@@ -630,11 +629,11 @@ class IMDbCrawler:
             The budget of the movie
         """
         try:
-            section_element= soup.find('section',{'data-testid': 'Boxoffice'})
-            div_element=section_element.find('div',{'data-testid':'title-boxoffice-section'})
-            li_element=div_element.find('li',{'data-testid':'title-boxoffice-budget'})
-            span_element=li_element.find('span',{'class':'ipc-metadata-list-item__list-content-item'})
-            return span_element.text.strip()
+            section_part= soup.find('section',{'data-testid': 'Boxoffice'})
+            div_part=section_part.find('div',{'data-testid':'title-boxoffice-section'})
+            li_part=div_part.find('li',{'data-testid':'title-boxoffice-budget'})
+            span_part=li_part.find('span',{'class':'ipc-metadata-list-item__list-content-item'})
+            return span_part.text.strip()
         except:
             print("failed to get budget")
 
@@ -662,14 +661,9 @@ class IMDbCrawler:
 def main():
     imdb_crawler = IMDbCrawler()
     # imdb_crawler.write_from_file_as_json()
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    }
-    response=requests.get('https://www.imdb.com/chart/top/',headers=headers)
-    print(response)
-    imdb_crawler.start_crawling(response)
+    imdb_crawler.start_crawling()
     imdb_crawler.write_to_file_as_json()
-    
+
     # headers = {
     #     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
     # }
