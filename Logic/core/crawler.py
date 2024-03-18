@@ -111,7 +111,7 @@ class IMDbCrawler:
         # print(response,"1")
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
-            movie_links = soup.find_all('a',{'class','ipc-title-link-wrapper'})
+            movie_links = soup.find_all('a',{'class_','ipc-title-link-wrapper'})
             for link in movie_links:
               if link['href'].startswith('/title'):
                 movie_url= "https://www.imdb.com"+link['href']
@@ -159,15 +159,16 @@ class IMDbCrawler:
         futures = []
         crawled_counter = 0
 
-        with ThreadPoolExecutor(max_workers=20) as executor:
-            while self.not_crawled and crawled_counter < self.crawling_threshold:
-                URL = self.not_crawled.popleft()
-                crawled_counter+=1
-                # print(URL,"  ",crawled_counter)
-                futures.append(executor.submit(self.crawl_page_info, URL))
-                if not self.not_crawled:
-                    wait(futures)
-                    futures = []
+        # with ThreadPoolExecutor(max_workers=20) as executor:
+        while self.not_crawled and crawled_counter < self.crawling_threshold:
+          URL = self.not_crawled.popleft()
+          crawled_counter+=1
+          # print(URL,"  ",crawled_counter)
+          futures.append(self.crawl_page_info(URL))
+          if not self.not_crawled:
+            if futures is not None:
+              wait(futures)
+              futures = []
 
     def crawl_page_info(self, URL):
         """
@@ -186,12 +187,14 @@ class IMDbCrawler:
           movie=self.get_imdb_instance()
           movie=self.extract_movie_info(response,movie,URL)
           # print(movie)
-          self.crawled.append(movie)
+          for key, value in movie.items():
+             self.crawled.add((key, value))
           # print(self.crawled)
-          for link in movie['related_links']:
-            if link not in self.added_ids:
-                self.not_crawled.append(link)
-                self.added_ids.add(self.get_id_from_URL(link))
+          if movie['related_links'] is not None:
+            for link in movie['related_links']:
+              if link not in self.added_ids:
+                  self.not_crawled.append(link)
+                  self.added_ids.add(self.get_id_from_URL(link))
 
     def extract_movie_info(self, res, movie, URL):
         """
@@ -208,27 +211,29 @@ class IMDbCrawler:
         """
         # TODO
         soup = BeautifulSoup(res.content, 'html.parser')
-        movie['title'] = self.get_title(soup)
-        movie['first_page_summary'] = self.get_first_page_summary(soup)
-        movie['release_year'] = self.get_release_year(soup)
-        movie['mpaa'] = self.get_mpaa(soup)
-        movie['budget'] = self.get_budget(soup)
-        movie['gross_worldwide'] = self.get_gross_worldwide(soup)
-        movie['directors'] = self.get_director(soup)
-        movie['writers'] = self.get_writers(soup)
-        movie['stars'] = self.get_stars(soup)
-        movie['related_links'] = self.get_related_links(soup)
-        movie['genres'] = self.get_genres(soup)
-        movie['languages'] = self.get_languages(soup)
-        movie['countries_of_origin'] = self.get_countries_of_origin(soup)
-        movie['rating'] = self.get_rating(soup)
-        response=requests.get(self.get_summary_link(URL),headers=self.headers)
-        soup1= BeautifulSoup(response.content, 'html.parser')
-        movie['summaries'] = self.get_summary(soup1)
-        movie['synopsis'] = self.get_synopsis(soup1)
-        response1=requests.get(self.get_review_link(URL),headers=self.headers)
-        soup2= BeautifulSoup(response1.content, 'html.parser')
-        movie['reviews'] = self.get_reviews_with_scores(soup2)
+        # print(soup)
+        movie['title'] = self.get_title()
+        # print(movie['title'])
+        movie['first_page_summary'] = self.get_first_page_summary()
+        movie['release_year'] = self.get_release_year()
+        movie['mpaa'] = self.get_mpaa()
+        movie['budget'] = self.get_budget()
+        movie['gross_worldwide'] = self.get_gross_worldwide()
+        movie['directors'] = self.get_director()
+        movie['writers'] = self.get_writers()
+        movie['stars'] = self.get_stars()
+        movie['related_links'] = self.get_related_links()
+        movie['genres'] = self.get_genres()
+        movie['languages'] = self.get_languages()
+        movie['countries_of_origin'] = self.get_countries_of_origin()
+        movie['rating'] = self.get_rating()
+        # response=requests.get(self.get_summary_link(URL),headers=self.headers)
+        # soup1= BeautifulSoup(response.content, 'html.parser')
+        movie['summaries'] = self.get_summary()
+        movie['synopsis'] = self.get_synopsis()
+        # response1=requests.get(self.get_review_link(URL),headers=self.headers)
+        # soup2= BeautifulSoup(response1.content, 'html.parser')
+        movie['reviews'] = self.get_reviews_with_scores()
         return movie
     def get_summary_link(url):
         """
@@ -283,6 +288,7 @@ class IMDbCrawler:
         """
         try:
             title_element = soup.find('div', class_='sc-d8941411-1')
+            print(title_element)
             if title_element:
               return  title_element.text.strip().split(':')[-1].strip()
             else:
