@@ -1,3 +1,9 @@
+import re
+from string import punctuation
+import nltk
+
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
 
 
 class Preprocessor:
@@ -13,7 +19,9 @@ class Preprocessor:
         """
         # TODO
         self.documents = documents
-        self.stopwords = []
+        with open("stopwords.txt", 'r', encoding='utf-8') as file:
+            stopwords = file.read().splitlines()
+        self.stopwords = set(stopwords)
 
     def preprocess(self):
         """
@@ -21,11 +29,17 @@ class Preprocessor:
 
         Returns
         ----------
-        str
+        List[str]
             The preprocessed documents.
         """
-         # TODO
-        return
+        preprocessed_documents = []
+        for document in self.documents:
+            processed_doc = self.normalize(document)
+            processed_doc = self.remove_links(processed_doc)
+            processed_doc = self.remove_punctuations(processed_doc)
+            processed_doc = self.remove_stopwords(processed_doc)
+            preprocessed_documents.append(processed_doc)
+        return preprocessed_documents
 
     def normalize(self, text: str):
         """
@@ -41,8 +55,10 @@ class Preprocessor:
         str
             The normalized text.
         """
-        # TODO
-        return
+        lemmatizer = WordNetLemmatizer()
+        words = word_tokenize(text.lower())
+        lemmatized_words = [lemmatizer.lemmatize(word) for word in words]
+        return ' '.join(lemmatized_words)
 
     def remove_links(self, text: str):
         """
@@ -59,8 +75,9 @@ class Preprocessor:
             The text with links removed.
         """
         patterns = [r'\S*http\S*', r'\S*www\S*', r'\S+\.ir\S*', r'\S+\.com\S*', r'\S+\.org\S*', r'\S*@\S*']
-        # TODO
-        return
+        for pattern in patterns:
+            text = re.sub(pattern, '', text)
+        return text
 
     def remove_punctuations(self, text: str):
         """
@@ -76,8 +93,7 @@ class Preprocessor:
         str
             The text with punctuations removed.
         """
-        # TODO
-        return
+        return text.translate(str.maketrans('', '', punctuation))
 
     def tokenize(self, text: str):
         """
@@ -93,8 +109,7 @@ class Preprocessor:
         list
             The list of words.
         """
-        # TODO
-        return
+        return word_tokenize(text)
 
     def remove_stopwords(self, text: str):
         """
@@ -110,6 +125,12 @@ class Preprocessor:
         list
             The list of words with stopwords removed.
         """
-        # TODO
-        return
+        words = self.tokenize(text)
+        filtered_words = [word for word in words if word.lower() not in self.stopwords]
+        return ' '.join(filtered_words)
 
+documents = ["This is an example document with some stopwords.", "Another document with common words."]
+stopwords_file = "stopwords.txt"
+preprocessor = Preprocessor(documents)
+preprocessed_docs = preprocessor.preprocess()
+print(preprocessed_docs)
