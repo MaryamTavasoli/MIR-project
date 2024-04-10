@@ -134,12 +134,10 @@ class SearchEngine:
                         scores2[field].update(scorer.compute_scores_with_vector_space_model(query, method))
                     else:
                         scores3[field].update(scorer.compute_scores_with_vector_space_model(query, method))
-
-                if max_results != -1 and (
-                        len(scores1[field]) + len(scores2[field]) + len(scores3[field])) > max_results:
+                scores = self.merge_scores(scores1, scores2, field)
+                scores = self.merge_scores(scores, scores3, field)
+                if max_results != -1 and (len(scores)) > max_results:
                     break
-            scores = self.merge_scores(scores1, scores2)
-            scores = self.merge_scores(scores, scores3)
 
     def find_scores_with_safe_ranking(self, query, method, weights, scores):
         """
@@ -159,7 +157,7 @@ class SearchEngine:
 
         for field in weights:
             # TODO
-            scorer = Scorer(self.tiered_index[field][tier], self.metadata_index['document_count'])
+            scorer = Scorer(self.metadata_index['document_count'])
             if method == 'OkapiBM25':
                 average_document_length = self.metadata_index["average_document_length"][field.value]
                 document_length = self.document_lengths_index[field]
@@ -168,9 +166,8 @@ class SearchEngine:
             else:
                 scores[field].update(scorer.compute_scores_with_vector_space_model(query, method))
 
-
-def merge_scores(self, scores1, scores2):
-    """
+    def merge_scores(self, scores1, scores2, field):
+        """
         Merges two dictionaries of scores.
 
         Parameters
@@ -186,13 +183,13 @@ def merge_scores(self, scores1, scores2):
             The merged dictionary of scores.
         """
 
-    # TODO
-    merged_scores = {}
-    for doc_id, score in scores1.items():
-        merged_scores[doc_id] = merged_scores.get(doc_id, 0) + score
-    for doc_id, score in scores2.items():
-        merged_scores[doc_id] = merged_scores.get(doc_id, 0) + score
-    return merged_scores
+        # TODO
+        merged_scores = {}
+        for doc_id, score in scores1[field].items():
+            merged_scores[doc_id] = merged_scores.get(doc_id, 0) + score
+        for doc_id, score in scores2[field].items():
+            merged_scores[doc_id] = merged_scores.get(doc_id, 0) + score
+        return merged_scores
 
 
 if __name__ == '__main__':
