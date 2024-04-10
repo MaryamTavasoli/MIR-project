@@ -1,7 +1,8 @@
 import re
 from string import punctuation
 import nltk
-
+nltk.download('punkt')
+nltk.download('wordnet')
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 
@@ -19,7 +20,7 @@ class Preprocessor:
         """
         # TODO
         self.documents = documents
-        with open("stopwords.txt", 'r', encoding='utf-8') as file:
+        with open("/stopwords.txt", 'r', encoding='utf-8') as file:
             stopwords = file.read().splitlines()
         self.stopwords = set(stopwords)
 
@@ -129,8 +130,3 @@ class Preprocessor:
         filtered_words = [word for word in words if word.lower() not in self.stopwords]
         return ' '.join(filtered_words)
 
-documents = ["This is an example document with some stopwords.", "Another document with common words."]
-stopwords_file = "stopwords.txt"
-preprocessor = Preprocessor(documents)
-preprocessed_docs = preprocessor.preprocess()
-print(preprocessed_docs)
