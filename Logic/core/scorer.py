@@ -1,4 +1,6 @@
 import math
+import nltk
+from nltk.tokenize import word_tokenize
 
 
 class Scorer:
@@ -67,7 +69,7 @@ class Scorer:
         idf = self.idf.get(term, None)
         if idf is None:
             df = len(self.index.get(term, {}))
-            idf = math.log(self.N / (df + 0.5))
+            idf = math.log((self.N) / (df + 0.5))
             self.idf[term] = idf
         return idf
 
@@ -253,4 +255,88 @@ class Scorer:
             numerator = tf_d * (k1 + 1)
             denominator = tf_d + (k1 * ((1 - b) + (b * (dl / average_document_field_length))))
             score += idf * (numerator / denominator)
+        return score
+
+    def compute_scores_with_unigram_model(
+            self, query, smoothing_method, document_lengths=None, alpha=0.5, lamda=0.5
+    ):
+        """
+        Calculates the scores for each document based on the unigram model.
+
+        Parameters
+        ----------
+        query : str
+            The query to search for.
+        smoothing_method : str (bayes | naive | mixture)
+            The method used for smoothing the probabilities in the unigram model.
+        document_lengths : dict
+            A dictionary of the document lengths. The keys are the document IDs, and the values are
+            the document's length in that field.
+        alpha : float, optional
+            The parameter used in bayesian smoothing method. Defaults to 0.5.
+        lamda : float, optional
+            The parameter used in some smoothing methods to balance between the document
+            probability and the collection probability. Defaults to 0.5.
+
+        Returns
+        -------
+        float
+            A dictionary of the document IDs and their scores.
+        """
+
+        # TODO
+        scores = {}
+        for document_id in self.get_list_of_documents(query):
+            score = self.compute_score_with_unigram_model(query, document_id, smoothing_method, document_lengths, alpha, lamda)
+            scores[document_id] = score
+        return scores
+
+    def compute_score_with_unigram_model(
+            self, query, document_id, smoothing_method, document_lengths, alpha, lamda
+    ):
+        """
+        Calculates the scores for each document based on the unigram model.
+
+        Parameters
+        ----------
+        query : str
+            The query to search for.
+        document_id : str
+            The document to calculate the score for.
+        smoothing_method : str (bayes | naive | mixture)
+            The method used for smoothing the probabilities in the unigram model.
+        document_lengths : dict
+            A dictionary of the document lengths. The keys are the document IDs, and the values are
+            the document's length in that field.
+        alpha : float, optional
+            The parameter used in bayesian smoothing method. Defaults to 0.5.
+        lamda : float, optional
+            The parameter used in some smoothing methods to balance between the document
+            probability and the collection probability. Defaults to 0.5.
+
+        Returns
+        -------
+        float
+            The Unigram score of the document for the query.
+        """
+
+        # TODO
+        score = 1.0
+        dl = document_lengths[document_id]
+        query_tfs = self.get_query_tfs(query)
+        for term, tf in query_tfs.items():
+            tf_d = self.index.get(term, {}).get(document_id, 0)
+            cf_t = 0
+            if self.index.get(term, {}) != {}:
+                for key in self.index.get(term, {}):
+                    cf_t += self.index.get(term, {}).get(key, 0)
+            T = 0
+            for key in document_lengths:
+                T += document_lengths[key]
+            if smoothing_method == "bayes":
+                score = score * (((tf_d + alpha * (cf_t / T)) / dl + alpha) ** tf)
+            elif smoothing_method == "mixture":
+                score = score * ((lamda*(tf_d/dl)+(1-lamda)*(cf_t/T)) ** tf)
+            else:
+                score = score * ((tf_d/dl)**tf)
         return score
