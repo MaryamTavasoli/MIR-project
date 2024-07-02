@@ -1,9 +1,6 @@
-# Updated snippet incorporating suggestions
-
 import streamlit as st
 import sys
 import time
-import random
 from enum import Enum
 
 sys.path.append("../")
@@ -220,15 +217,59 @@ def search_handling(
                     and len(st.session_state["search_results"]) > 0
             )
 
+    # Feedback section
+    st.sidebar.header("Feedback")
+    if "feedback" not in st.session_state:
+        st.session_state.feedback = ""
 
-# Main function to run the app
+    feedback = st.sidebar.text_area("Your Feedback:", value=st.session_state.feedback, key="feedback_area")
+
+    if st.sidebar.button("Submit Feedback"):
+        save_feedback(feedback)
+        st.session_state.feedback = ""
+        st.sidebar.success("Thank you for your feedback!")
+
+
+    # Navigation to introduction page
+    st.sidebar.markdown("---")
+
+    if st.sidebar.button("About"):
+        show_introduction()
+
+
+def save_feedback(feedback):
+    feedback_file = "/Users/maryamtavasoli/Desktop/IMDb-IR-System-main-phase2/UI/user_feedback.txt"  # Name of the feedback file
+    with open(feedback_file, "a", encoding="utf-8") as file:
+        file.write(feedback + "\n")
+
+
+def show_introduction():
+    st.title("About Movie Search Engine")
+    st.write("""
+    Welcome to the Movie Search Engine, a simple search application for IMDb movies. 
+    This application allows you to search through the IMDb dataset and find the most relevant movie based on your search terms.
+    """)
+
+    st.header("How It Works")
+    st.write("""
+    The search engine uses advanced indexing and ranking algorithms to provide accurate search results. 
+    You can adjust search parameters such as weights for different features and search methods to refine your results.
+    """)
+
+    st.header("About Us")
+    st.write("""
+    This project is a collaborative effort between the MIR Team at Sharif University and Maryam Tavasoli. 
+    Our goal is to provide a user-friendly and efficient movie search experience using modern information retrieval techniques.
+    """)
+
+
 def main():
     st.title("Movie Search Engine")
     st.write(
         "This is a simple search engine for IMDb movies. You can search through the IMDb dataset and find the most relevant movie to your search terms."
     )
     st.markdown(
-        '<span style="color:yellow">Developed By: MIR Team at Sharif University</span>',
+        '<span style="color:red">Developed By: MIR Team at Sharif University</span>',
         unsafe_allow_html=True,
     )
 
@@ -236,58 +277,75 @@ def main():
     with st.sidebar:
         st.header("Advanced Search")
         search_max_num = st.number_input(
-            "Maximum number of results", min_value=5, max_value=100, value=10, step=1
-        )
-        weight_stars = st.slider(
-            "Weight of stars in search",
-            min_value=0.0,
-            max_value=1.0,
-            value=1.0,
-            step=0.1,
+            "Maximum number of results", min_value=5, max_value=100, value=10, step=5
         )
 
-        weight_genres = st.slider(
-            "Weight of genres in search",
-            min_value=0.0,
-            max_value=1.0,
-            value=1.0,
-            step=0.1,
-        )
-
-        weight_summary = st.slider(
-            "Weight of summary in search",
-            min_value=0.0,
-            max_value=1.0,
-            value=1.0,
-            step=0.1,
-        )
-        slider_ = st.slider("Select the number of top movies to show", 1, 10, 5)
+        weight_stars = st.slider("Weight for Stars", 0.0, 1.0, 0.3, 0.1, key="stars_weight")
+        weight_genres = st.slider("Weight for Genres", 0.0, 1.0, 0.3, 0.1, key="genres_weight")
+        weight_summary = st.slider("Weight for Summary", 0.0, 1.0, 0.4, 0.1, key="summary_weight")
 
         search_weights = [weight_stars, weight_genres, weight_summary]
         search_method = st.selectbox(
-            "Search method", ("ltn.lnn", "ltc.lnc", "OkapiBM25", "unigram")
+            "Search method", ("ltn.lnn", "ltc.lnc", "OkapiBM25", "unigram"), key="search_method"
         )
 
         unigram_smoothing = None
         alpha, lamda = None, None
         if search_method == "unigram":
-            unigram_smoothing = st.selectbox("Unigram Smoothing", ("laplace", "jm"))
-            if unigram_smoothing == "jm":
-                alpha = st.number_input(
-                    "Enter alpha value (JM Smoothing)", min_value=0.0, max_value=1.0, value=0.5
-                )
-            lamda = st.number_input(
-                "Enter lambda value (Dirichlet)", min_value=0.0, max_value=1.0, value=0.5
+            unigram_smoothing = st.selectbox(
+                "Smoothing method",
+                ("naive", "bayes", "mixture"),
+                key="smoothing_method"
             )
+            if unigram_smoothing == "bayes":
+                alpha = st.slider(
+                    "Alpha",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.5,
+                    step=0.1,
+                    key="alpha_slider"
+                )
+            if unigram_smoothing == "mixture":
+                alpha = st.slider(
+                    "Alpha",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.5,
+                    step=0.1,
+                    key="alpha_slider"
+                )
+                lamda = st.slider(
+                    "Lambda",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.5,
+                    step=0.1,
+                    key="lambda_slider"
+                )
 
-        color = st.color_picker("Pick a color for text highlighting", "#00FF00")
+        # Color picker for highlighted text
+        highlight_color = st.color_picker("Pick a highlight color", value="#00FF51", key="color_picker")
 
-        filter_button = st.button("Filter Results")
+        # Filter results interface
+        num_filter_results = st.number_input(
+            "Number of filtered results to show", min_value=1, max_value=20, value=10, step=1, key="filter_results"
+        )
+        filter_button_key = "filter_button"  # Unique key for filter button
+        filter_button = st.button("Filter Results", key=filter_button_key)
 
+        if filter_button:
+            if num_filter_results > search_max_num:
+                st.warning(
+                    f"Filtered results cannot exceed maximum number of search results ({search_max_num}). Setting filtered results to 1."
+                )
+                num_filter_results = 1
+
+    # Main search interface
     search_term = st.text_input("Enter your search term:")
-    search_button = st.button("Search")
+    search_button_key = "search_button"  # Unique key for search button
+    search_button = st.button("Search", key=search_button_key)
 
-    num_filter_results = slider_
     search_handling(
         search_button,
         search_term,
@@ -299,7 +357,7 @@ def main():
         lamda,
         filter_button,
         num_filter_results,
-        color,
+        highlight_color,
     )
 
 
